@@ -35,9 +35,7 @@ func ExtractHostToPrint(url_t string) string {
 	return uri.Host + uri.Path
 }
 
-func TestOneByOneSQLi(url_t string, name string, wg *sync.WaitGroup, sem chan bool) {
-	defer wg.Done()
-	<-sem
+func TestOneByOneSQLi(url_t string, name string, sem chan bool) {
 	payloads := url.Values{}
 	var new_url string
 	for _, ssti_payload := range ssti_payloads {
@@ -78,13 +76,14 @@ func main() {
 		parsedUri, _ := url.Parse(url_t)
 		query, _ := url.ParseQuery(parsedUri.RawQuery)
 		for name := range query {
-			wg.Add(1)
 			sem <- true
-			go TestOneByOneSQLi(url_t, name, &wg, sem)
+			wg.Add(1)
+			go func() {
+				TestOneByOneSQLi(url_t, name, sem)
+				<-sem
+			}()
+			wg.Done()
 		}
-	}
-	for i := 0; i < cap(sem); i++ {
-		sem <- true
 	}
 	wg.Wait()
 }
